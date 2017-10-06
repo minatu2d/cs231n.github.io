@@ -123,34 +123,34 @@ Chúng ta sẽ tính toán khối đầu ra bằng hàm nhận các đầu vào 
 
 *Ví dụ thật - Real-world example*. Kiến trúc mạng [Krizhevsky et al.](http://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks), cái mà đã chiến thắng ImageNet challenge in 2012 sử dụng ảnh đầu vào có kích thước [227x227x3]. Trong lớp Convolutional đầu tiên, nó sử dụng receptive field kích thước \\(F = 11\\), stride \\(S = 4\\) và không zero-padding \\(P = 0\\). Vì (227 - 11)/4 + 1 = 55, và vì Conv layer đó có độ sâu \\(K = 96\\), nên khối đầu ra của Conv này sẽ có kích thước [55x55x96]. Mỗi neuron trong 55\*55\*96 neurons của khối đầu ra được kết nối đến một vùng nhỏ có kích thước [11x11x3] trên khối đầu vào. Hơn nữa, tất cả 96 neurons ở mỗi cột động sâu được kết nối đến cùng một vùng có kích thước [11x11x3] trên đầu vào, và tất nhiên với trọng số khác nhau. Có một chuyện khá vui, Nếu bạn đã đọc paper rồi thì bạn sẽ thắc mắc rằng kích thước ảnh được ghi là 224x224, nhưng như thế không đúng vì (224 - 11)/4 + 1 rõ ràng không thể là một số nguyên được. Điều này gây ra khó hiểu cho rất nhiều người khi nói về lịch sử của ConvNets và muốn biết chỗ đó là như nào. Suy đoán của tôi là Alex đã dùng zero-padding 3 điểm ảnh nhưng anh ấy không nhắc tới nó trong paper.
 
-**Chia sẻ tham số - Parameter Sharing.** Mô hình chia sẻ tham số được sử dụng trong các lớp Convolutional để kiếm soát lượng tham số. Trong ví dụ thực tế ở trên, we see that there are 55\*55\*96 = 290,400 neurons in the first Conv Layer, and each has 11\*11\*3 = 363 weights and 1 bias. Together, this adds up to 290400 * 364 = 105,705,600 parameters on the first layer of the ConvNet alone. Clearly, this number is very high.
+**Chia sẻ tham số - Parameter Sharing.** Mô hình chia sẻ tham số được sử dụng trong các lớp Convolutional để kiếm soát lượng tham số. Trong ví dụ thực tế ở trên, chúng ta thấy có đến 55\*55\*96 = 290,400 neurons trong lớp Conv đầu tiên, mỗi neuron này có 11\*11\*3 = 363 trọng số và 1 bias. Cộng hết vào, chúng ta sẽ có 290400 * 364 = 105,705,600 tham số chỉ trong lớp đầu tiên của ConvNet. Rõ ràng, con số này quá lớn.
 
-It turns out that we can dramatically reduce the number of parameters by making one reasonable assumption: That if one feature is useful to compute at some spatial position (x,y), then it should also be useful to compute at a different position (x2,y2). In other words, denoting a single 2-dimensional slice of depth as a **depth slice** (e.g. a volume of size [55x55x96] has 96 depth slices, each of size [55x55]), we are going to constrain the neurons in each depth slice to use the same weights and bias. With this parameter sharing scheme, the first Conv Layer in our example would now have only 96 unique set of weights (one for each depth slice), for a total of 96\*11\*11\*3 = 34,848 unique weights, or 34,944 parameters (+96 biases). Alternatively, all 55\*55 neurons in each depth slice will now be using the same parameters. In practice during backpropagation, every neuron in the volume will compute the gradient for its weights, but these gradients will be added up across each depth slice and only update a single set of weights per slice.
+Thực tế chứng minh rằng, chúng ta có thể giảm đáng kể lượng tham số bằng cách đưa ra một giả định hợp lý rằng: đó là, nếu một đặc tính - feature hữu dụng để tính toán ở một vài vị trí (x,y), thì nó cũng hữu dụng để tính toán ở một vị trí (x2,y2) khác. Nói cách khác, biểu diễn độ dịch chuyển một mảng 2 chiều theo là **depth slice (bước theo sâu)** (ví dụ: một khối có kích thước [55x55x96] có 96 bước, mỗi cái có kích thước [55x55]), chúng ta sẽ ràng buộc là các neuron ở cùng độ sâu sử dụng cùng một tập trọng số và bias. Với mô hình chia sẻ tham số này, lớp Conv đầu tiên trong ví dụ của chúng ta chỉ có 96 tập trọng số riêng biệt mà thôi (mỗi độ sâu có một cái), vậy tổng sẽ là 96\*11\*11\*3 = 34,848 trọng số riêng biệt, hay 34,944 tham số (+96 biases). Tức là, tất cả 55\*55 neurons ở cùng một độ sâu thì sử dụng chung tham số. Trong thực tế, khi phản hồi ngược, mỗi neuron trong khối sẽ tính toán sẽ tính gradient ứng với trọng số của nó, nhưng những gradients này sẽ được cộng trên toàn độ sâu đó và chỉ cập nhật một tập trọng số trên mỗi độ sâu thôi.
 
-Notice that if all neurons in a single depth slice are using the same weight vector, then the forward pass of the CONV layer can in each depth slice be computed as a **convolution** of the neuron's weights with the input volume (Hence the name: Convolutional Layer). This is why it is common to refer to the sets of weights as a **filter** (or a **kernel**), that is convolved with the input.
+Chú ý là, nếu tất cả các neuron trong cùng một độ sâu sử dụng cùng vector trọng số, thì bước forward pass của lớp CONV trong mỗi độ sâu được tính toán sẽ giống như việc xoắn **convolution** các trọng số của neuron với khối đầu vào (vậy mới có cái tên: Convolutional Layer). Đây cũng là lý do tạo sao người ta gọi tập các trọng số là bộ lọc **filter** (hoặc nhân **kernel**), cái được cuốn với đầu vào.
 
 <div class="fig figcenter fighighlight">
   <img src="/assets/cnn/weights.jpeg">
   <div class="figcaption">
-    Example filters learned by Krizhevsky et al. Each of the 96 filters shown here is of size [11x11x3], and each one is shared by the 55*55 neurons in one depth slice. Notice that the parameter sharing assumption is relatively reasonable: If detecting a horizontal edge is important at some location in the image, it should intuitively be useful at some other location as well due to the translationally-invariant structure of images. There is therefore no need to relearn to detect a horizontal edge at every one of the 55*55 distinct locations in the Conv layer output volume.
+    Filters ví dụ được học trong Krizhevsky et al. Mỗi tập trong 96 filters có kích thước là [11x11x3], và được chia sẻ bởi 55*55 neurons ở cùng một độ sâu. Chú ý rằng giả định nền tảng cho việc chia sẻ tham số là tương đối hợp lý: Nếu tính toán để phát hiện cạnh ngang ở một số vị trí trên ảnh, về mặt trực giác thì tính toán đó cũng có thể hữu ích ở một số vị trí khác do cấu trúc chuyển dịch bất biến của ảnh. Chính vì lé đó, sẽ không cần học lại để phát hiện một cạnh ngang ở mỗi vị trí trong tất cả các vị trí của 55x55 trong khối đầu ra của Conv nữa.
   </div>
 </div>
 
-Note that sometimes the parameter sharing assumption may not make sense. This is especially the case when the input images to a ConvNet have some specific centered structure, where we should expect, for example, that completely different features should be learned on one side of the image than another. One practical example is when the input are faces that have been centered in the image. You might expect that different eye-specific or hair-specific features could (and should) be learned in different spatial locations. In that case it is common to relax the parameter sharing scheme, and instead simply call the layer a **Locally-Connected Layer**.
+Chú ý rằng, thỉnh thoảng giả định chia sẻ tham số này cũng không hiệu quả. Đây là trường hợp đặc biệt khi ảnh đầu vào cho ConvNet có cấu trúc căn giữa nhất định, khi đó cái chúng ta mong muốn, các đặc tính - features học được từ một phía của ảnh có thể hoàn toàn khác với chiều khác. Một ví dụ thực tế là khi đầu vào là nhiều khuôn mặt nằm ở giữa ảnh. Bạn có thể mong muốn rằng đặc tính cụ thể của mắt, tóc có thể được học từ các vị trí không gian khác nhau. Trong trường hợp đó, người ta thường nới lỏng mô hình chia sẻ tham số, và đơn giản gọi một lớp đó là **Locally-Connected Layer**.
 
-**Numpy examples.** To make the discussion above more concrete, lets express the same ideas but in code and with a specific example. Suppose that the input volume is a numpy array `X`. Then:
+**Ví dụ bằng Numpy.** Để biến những thảo luận ở trên cụ thể hơn, cùng ý tưởng như trên, hãy cùng nhau biểu diễn trong code qua các ví dụ cụ thể. Giả định khối đầu vào là một mảng numy `X`. Thì:
 
-- A *depth column* (or a *fibre*) at position `(x,y)` would be the activations `X[x,y,:]`.
-- A *depth slice*, or equivalently an *activation map* at depth `d` would be the activations `X[:,:,d]`. 
+- Cột theo độ sâu - *depth column* (hay gọi *fibre*) ở vị trí `(x,y)` sẽ là `X[x,y,:]`.
+- Bảng tương ứng với độ sâu - *depth slice*, hoặc bảng kích hoạt -  *activation map* ở độ sâu `d` sẽ là `X[:,:,d]`. 
 
-*Conv Layer Example*. Suppose that the input volume `X` has shape `X.shape: (11,11,4)`. Suppose further that we use no zero padding (\\(P = 0\\)), that the filter size is \\(F = 5\\), and that the stride is \\(S = 2\\). The output volume would therefore have spatial size (11-5)/2+1 = 4, giving a volume with width and height of 4. The activation map in the output volume (call it `V`), would then look as follows (only some of the elements are computed in this example):
+*Conv Layer Example*. Giả sử, khối đầu vào `X` có hình dạng `X.shape: (11,11,4)`. Giả định thêm nữa, chúng ta không sử dụng zerp-padding (\\(P = 0\\)), rồi thì kích thước filter \\(F = 5\\), bước kéo filter \\(S = 2\\). Kích thước khối đầu ra sẽ được tính bằng (11-5)/2+1 = 4, một khối có kích thước hàng, cột là 4. Bảng kích hoạt ở khối đầu ra (gọi nó là `V`), trong sẽ giống như sau (chỉ một vài phần tử được tính trong ví dụ này):
 
 - `V[0,0,0] = np.sum(X[:5,:5,:] * W0) + b0`
 - `V[1,0,0] = np.sum(X[2:7,:5,:] * W0) + b0`
 - `V[2,0,0] = np.sum(X[4:9,:5,:] * W0) + b0`
 - `V[3,0,0] = np.sum(X[6:11,:5,:] * W0) + b0`
 
-Remember that in numpy, the operation `*` above denotes elementwise multiplication between the arrays. Notice also that the weight vector `W0` is the weight vector of that neuron and `b0` is the bias. Here, `W0` is assumed to be of shape `W0.shape: (5,5,4)`, since the filter size is 5 and the depth of the input volume is 4. Notice that at each point, we are computing the dot product as seen before in ordinary neural networks. Also, we see that we are using the same weight and bias (due to parameter sharing), and where the dimensions along the width are increasing in steps of 2 (i.e. the stride). To construct a second activation map in the output volume, we would have:
+Nhớ rằng trong numpy, phép `*` biểu diễn phép toán nhân từng phần tử trong mảng. Và chú ý đến vector `W0` là vector trọng số của neuron và `b0` là bias. Ở đây, `W0` được giả định có dạng hình học `W0.shape: (5,5,4)`, vì kích thước filter là 5 và độ sâu của khối đầu vào là 4. Chú ý là, ở mỗi điểm, chúng ta sẽ thực hiện phép nhân vô hướng như đã thấy ở mạng neural thông thương. Cũng ở đây, chúng ta thấy rằng chúng ta đang sử dụng cùng weight and bias (do parameter sharing), các mảng được dịch dần theo chiều rộng với bước kéo là 2 (chính là stride). Để tính bảng activation map thứ hai trong khối đầu ra, chúng ta sẽ làm như sau:
 
 - `V[0,0,1] = np.sum(X[:5,:5,:] * W1) + b1`
 - `V[1,0,1] = np.sum(X[2:7,:5,:] * W1) + b1`
@@ -159,108 +159,108 @@ Remember that in numpy, the operation `*` above denotes elementwise multiplicati
 - `V[0,1,1] = np.sum(X[:5,2:7,:] * W1) + b1` (example of going along y)
 - `V[2,3,1] = np.sum(X[4:9,6:11,:] * W1) + b1` (or along both)
 
-where we see that we are indexing into the second depth dimension in `V` (at index 1) because we are computing the second activation map, and that a different set of parameters (`W1`) is now used. In the example above, we are for brevity leaving out some of the other operations the Conv Layer would perform to fill the other parts of the output array `V`. Additionally, recall that these activation maps are often followed elementwise through an activation function such as ReLU, but this is not shown here.
+Ở chúng ta thấy rằng chúng ta đang thao tác với độ sâu thứ hai của `V` (tức là index 1) vì chúng ta đang tính bảng activation map thứ 2, và một tập tham số khác (`W1`) được sử dụng. Ở ví dụ trên, chúng ta đã ngầm định bỏ qua một số thao tác khác cho lớp Conv Layer để điền đầy đủ các giá trị của `V`. Thêm vào đó, nhớ lại một chút rằng, các bảng activation maps thường được đưa qua các hàm activation như ReLU, nhưng cái đó không được nói ở đây.
 
-**Summary**. To summarize, the Conv Layer:
+**Tóm tắt**. Đến đây, chúng ta có Conv Layer:
 
-- Accepts a volume of size \\(W_1 \times H_1 \times D_1\\)
-- Requires four hyperparameters: 
-  - Number of filters \\(K\\), 
-  - their spatial extent \\(F\\), 
-  - the stride \\(S\\), 
-  - the amount of zero padding \\(P\\).
-- Produces a volume of size \\(W_2 \times H_2 \times D_2\\) where:
+- Nhận vào một khối có kích thước \\(W_1 \times H_1 \times D_1\\)
+- Cần 4 siêu tham số: 
+  - Số filters \\(K\\), 
+  - Phạm vi về số chiều \\(F\\), 
+  - Bước khi kéo qua khối đầu vào \\(S\\), 
+  - Số lượng zero-padding \\(P\\).
+- Tạo ra một khối có kích thước \\(W_2 \times H_2 \times D_2\\) với:
   - \\(W_2 = (W_1 - F + 2P)/S + 1\\)
-  - \\(H_2 = (H_1 - F + 2P)/S + 1\\) (i.e. width and height are computed equally by symmetry)
+  - \\(H_2 = (H_1 - F + 2P)/S + 1\\) (i.e. chiều rộng, chiều cao được coi như nhau)
   - \\(D_2 = K\\)
-- With parameter sharing, it introduces \\(F \cdot F \cdot D_1\\) weights per filter, for a total of \\((F \cdot F \cdot D_1) \cdot K\\) weights and \\(K\\) biases.
-- In the output volume, the \\(d\\)-th depth slice (of size \\(W_2 \times H_2\\)) is the result of performing a valid convolution of the \\(d\\)-th filter over the input volume with a stride of \\(S\\), and then offset by \\(d\\)-th bias.
+- Với chia sẻ tham số, nó sẽ tạo ra \\(F \cdot F \cdot D_1\\) trọng số cho mỗi filter, tổng số là \\((F \cdot F \cdot D_1) \cdot K\\) trọng số và \\(K\\) biases.
+- Trong khối đầu ra, ở độ sâu thứ \\(d\\)-th  (có kích thước \\(W_2 \times H_2\\)) là kết quả thực hiện một thao tác xoắn filter thứ \\(d\\)-th qua khối đầu vào với bước kéo là \\(S\\), và có \\(d\\)-th bias là offset.
 
-A common setting of the hyperparameters is \\(F = 3, S = 1, P = 1\\). However, there are common conventions and rules of thumb that motivate these hyperparameters. See the [ConvNet architectures](#architectures) section below.
+Một cấu hình phổ biến của các siêu tham số là \\(F = 3, S = 1, P = 1\\). Tuy nhiên, có những quy tắc chung và dựa trên kinh nghiệm để điều chỉnh những siêu tham số này. Xem chương [ConvNet architectures](#architectures) bên dưới.
 
-**Convolution Demo**. Below is a running demo of a CONV layer. Since 3D volumes are hard to visualize, all the volumes (the input volume (in blue), the weight volumes (in red), the output volume (in green)) are visualized with each depth slice stacked in rows. The input volume is of size \\(W_1 = 5, H_1 = 5, D_1 = 3\\), and the CONV layer parameters are \\(K = 2, F = 3, S = 2, P = 1\\). That is, we have two filters of size \\(3 \times 3\\), and they are applied with a stride of 2. Therefore, the output volume size has spatial size (5 - 3 + 2)/2 + 1 = 3. Moreover, notice that a padding of \\(P = 1\\) is applied to the input volume, making the outer border of the input volume zero. The visualization below iterates over the output activations (green), and shows that each element is computed by elementwise multiplying the highlighted input (blue) with the filter (red), summing it up, and then offsetting the result by the bias.
+**Convolution Demo**. Bên dưới là một demo của lớp CONV. Vì khối 3D rất khó để mô phỏng, tất cả các khối (khối đầu vào (màu xanh dương), khối trọng số (màu đỏ), khối đầu ra (màu xanh lá)) được mô phỏng theo mỗi độ sâu một dòng. Khối đầu vào có kích thước \\(W_1 = 5, H_1 = 5, D_1 = 3\\), và các tham số của lớp CONV \\(K = 2, F = 3, S = 2, P = 1\\). Đó là, chúng ta có 2 filter, với kích thước \\(3 \times 3\\), và chúng ta sử dụng bước kéo stride 2. Vì thế, kích thước không gian khối đầu ra (5 - 3 + 2)/2 + 1 = 3. Hơn nữa, chú ý là có sử dụng padding \\(P = 1\\) trên khối đầu vào, đưa vào biên của khối đầu vào một dãy 0. Mô phỏng dưới đây lần lượt thực hiện theo tức tự của các giá trị khối đầu ra (xanh lá), và chỉ ra mỗi phần tử được tính toán bằng cách nhân từng phần tử được chọn ở đầu vào (xanh da trời) và filter (đỏ), rồi cộng chúng lại, cuối cùng cọng với bias như là offset.
 
 <div class="fig figcenter fighighlight">
   <iframe src="/assets/conv-demo/index.html" width="100%" height="700px;" style="border:none;"></iframe>
   <div class="figcaption"></div>
 </div>
 
-**Implementation as Matrix Multiplication**. Note that the convolution operation essentially performs dot products between the filters and local regions of the input. A common implementation pattern of the CONV layer is to take advantage of this fact and formulate the forward pass of a convolutional layer as one big matrix multiply as follows:
+**Thực thi bằng phép nhân ma trận**. Chú ý rằng thao tác xoắn về cơ bản thực hiện phép nhân vô hướng giữa filter và một vùng nhỏ của đầu ra. Một cách implementation phổ biến của lớp CONV là lợi dụng tính chất này và thực hiện hàm forward pass của một lớp convolutional layer giống như một phép nhân ma trận lớn như bên dưới:
 
-1. The local regions in the input image are stretched out into columns in an operation commonly called **im2col**. For example, if the input is [227x227x3] and it is to be convolved with 11x11x3 filters at stride 4, then we would take [11x11x3] blocks of pixels in the input and stretch each block into a column vector of size 11\*11\*3 = 363. Iterating this process in the input at stride of 4 gives (227-11)/4+1 = 55 locations along both width and height, leading to an output matrix `X_col` of *im2col* of size [363 x 3025], where every column is a stretched out receptive field and there are 55*55 = 3025 of them in total. Note that since the receptive fields overlap, every number in the input volume may be duplicated in multiple distinct columns.
-2. The weights of the CONV layer are similarly stretched out into rows. For example, if there are 96 filters of size [11x11x3] this would give a matrix `W_row` of size [96 x 363].
-3. The result of a convolution is now equivalent to performing one large matrix multiply `np.dot(W_row, X_col)`, which evaluates the dot product between every filter and every receptive field location. In our example, the output of this operation would be [96 x 3025], giving the output of the dot product of each filter at each location. 
-4. The result must finally be reshaped back to its proper output dimension [55x55x96].
+1. Các vùng cục bộ trong ảnh đầu vào được kéo giãn thành các cột thông qua một thao tác phổ biến tên là **im2col**. Ví dụ, input có kích thước [227x227x3] và được xoắn với các filte kích thước 11x11x3, theo bước kéo 4, chúng ta sẽ quan tâm đến các khối có kích thước [11x11x3] điểm trên đầu vào và kéo giãn chúng ra thành một vector cột có kích thước 11\*11\*3 = 363. Lặp lại quá trình này trên đầu vào với bước kéo là 4 sẽ cho ra (227-11)/4+1 = 55 vị trí trên cả chiều rộng và chiều cao, cuối cùng tạo được ma trận đầu ra `X_col` từ *im2col* có kích thước [363 x 3025], trong đó mõi cột là kết quả kéo dãn từ receptive field và có tổng cộng 55*55 = 3025 cột. Vì các receptive fields này bị chèn vào nhau, nên mỗi số trong khối đầu vào có thể bị lặp lại nhiều lần trong các cột khác nhau.
+2. Trọng số của lớp CONV cũng tương tự nhưng được kéo giãn thành hàng. Ví dụ, có 96 filter kích thước [11x11x3] thì ta sẽ có ma trận trọng số `W_row` có kích thước [96 x 363].
+3. Kết quả của phép xoắn (convolution) tương đương với việc thực hiện một phép nhân ma trận lớn `np.dot(W_row, X_col)`, sau đó có được tích vô hướng giữa filter và mỗi vị trí receptive field. Trong trường hợp của chúng ta, đầu ra của phép tính này sẽ có kích thước [96 x 3025], tức là đầu ra của phép vô hướng giữa mỗi filter trên mỗi vị trí trên ảnh đầu vào. 
+4. Sau đó kết quả lại được co lại trở về kích thước mong muốn của đầu ra [55x55x96].
 
-This approach has the downside that it can use a lot of memory, since some values in the input volume are replicated multiple times in `X_col`. However, the benefit is that there are many very efficient implementations of Matrix Multiplication that we can take advantage of (for example, in the commonly used [BLAS](http://www.netlib.org/blas/) API). Moreover, the same *im2col* idea can be reused to perform the pooling operation, which we discuss next.
+Hướng tiếp cận này có một điểm trừ, đó là tốn rất nhiều bộ nhớ, vì nhiều giá trị của khối đầu vào được lặp lại nhiều lần trong ma trận `X_col`. Tuy nhiên, có một lợi thế là có rất nhiều các thực thi để thực hiện phép nhân ma trận - Matrix Multiplication hiệu quả (ví dụ, một thứ được sử dụng phổ biến là [BLAS](http://www.netlib.org/blas/) API). Hơn nữa, vẫn ý tưởng sử dụng *im2col* có thể được sử dụng tiếp để thực hiện phép pooling, cái mà chúng ta sẽ thảo luận bên dưới đây.
 
-**Backpropagation.** The backward pass for a convolution operation (for both the data and the weights) is also a convolution (but with spatially-flipped filters). This is easy to derive in the 1-dimensional case with a toy example (not expanded on for now).
+**Phản hồi ngược.** Chiều ngược lại của thao tác xoắn (backward pass) (cho cả dữ liệu và trọng số) cũng là một convolution (nhưng filter bị đảo chiều không gian). Dễ dàng lấy đạo hàm trong trường hợp một chiều thì tương đối dễ dàng (xin không nói ở đây).
 
-**1x1 convolution**. As an aside, several papers use 1x1 convolutions, as first investigated by [Network in Network](http://arxiv.org/abs/1312.4400). Some people are at first confused to see 1x1 convolutions especially when they come from signal processing background. Normally signals are 2-dimensional so 1x1 convolutions do not make sense (it's just pointwise scaling). However, in ConvNets this is not the case because one must remember that we operate over 3-dimensional volumes, and that the filters always extend through the full depth of the input volume. For example, if the input is [32x32x3] then doing 1x1 convolutions would effectively be doing 3-dimensional dot products (since the input depth is 3 channels).
+**1x1 convolution**. Một mặt khác, có vài paper sử dụng convolution kích thước 1x1, đầu tien là [Network in Network](http://arxiv.org/abs/1312.4400). Nhiều người có vẻ thấy khỏ hiểu khi thấy convolutions 1x1 đặc biệt khi họ xuất phát từ chuyên ngành xử lý tín hiệu. Thông thường các tín hiệu sẽ là 2 chiều - 2-dimensional vì thế convolutions 1x1 có vẻ không hợp lý lắm (nó chỉ là một tỉ lệ theo điểm). Tuy nhiên, trong ConvNets nó không như thế vì chúng ta thực hiện các thao tác trên khối 3-dimensional, filter sẽ luôn được mở rộng theo toàn bộ độ sâu của khối đầu vào. Ví dụ, nếu đầu vào có kích thước [32x32x3] thì khi thực hiện convolution 1x1 sẽ thực hiện phép tính vô hướng 3-dimensional (vì chiều sâu của đầu vào là 3 mà).
 
-**Dilated convolutions.** A recent development (e.g. see [paper by Fisher Yu and Vladlen Koltun](https://arxiv.org/abs/1511.07122)) is to introduce one more hyperparameter to the CONV layer called the *dilation*. So far we've only discussed CONV filters that are contiguous. However, it's possible to have filters that have spaces between each cell, called dilation. As an example, in one dimension a filter `w` of size 3 would compute over input `x` the following: `w[0]*x[0] + w[1]*x[1] + w[2]*x[2]`. This is dilation of 0. For dilation 1 the filter would instead compute `w[0]*x[0] + w[1]*x[2] + w[2]*x[4]`; In other words there is a gap of 1 between the applications. This can be very useful in some settings to use in conjunction with 0-dilated filters because it allows you to merge spatial information across the inputs much more agressively with fewer layers. For example, if you stack two 3x3 CONV layers on top of each other then you can convince yourself that the neurons on the 2nd layer are a function of a 5x5 patch of the input (we would say that the *effective receptive field* of these neurons is 5x5). If we use dilated convolutions then this effective receptive field would grow much quicker.
+**Dilated convolutions.** Gần đây (ví dụ trong [paper by Fisher Yu and Vladlen Koltun](https://arxiv.org/abs/1511.07122)) đã giới thiệu thêm một tham số cho lớp CONV được gọi là sự giãn *dilation*. Cho đến giờ chúng ta chỉ thảo luận về CONV filters liền kề nhau. Tuy nhiên, có thể có filter mà có khoảng trống giữa các ô, gọi là ô nở hay dilation. Ví dụ, trong filter ở dạng một chiều `w` có kích thước 3 tính toán với đầu vào `x` bằng công thức: `w[0]*x[0] + w[1]*x[1] + w[2]*x[2]`. Đây là độ giãn nở bằng 0. Ví dụ khi độ giãn nở bằng 1, nó sẽ tính `w[0]*x[0] + w[1]*x[2] + w[2]*x[4]`; Hay nói cách khác có một gap giữa các ứng dụng. Cái này có thể rất hữu ích khi so sánh với filter không giãn - 0-dilated filters bởi vì nó cho phép bạn trộn thông tin không gian đến đầu vào mạnh hơn với số lớp ít hơn. Ví dụ, bạn đặt 2 lớp CONV kích thước 3x3 trên các lớp khác thì bạn có thể tự thuyết phụ mình rằng các neurons ở lớp thứ 2 là một hàm với đầu vào là các vùng 5x5 trên khối đầu vào (và chúng ta có thể nói rằng *effective receptive field* của những neuron này là 5x5). Nếu bạn sử dụng convolution giãn nở con số này sẽ lớn lên nhanh chóng.
 
 <a name='pool'></a>
 
 #### Pooling Layer
 
-It is common to periodically insert a Pooling layer in-between successive Conv layers in a ConvNet architecture. Its function is to progressively reduce the spatial size of the representation to reduce the amount of parameters and computation in the network, and hence to also control overfitting. The Pooling Layer operates independently on every depth slice of the input and resizes it spatially, using the MAX operation. The most common form is a pooling layer with filters of size 2x2 applied with a stride of 2 downsamples every depth slice in the input by 2 along both width and height, discarding 75% of the activations. Every MAX operation would in this case be taking a max over 4 numbers (little 2x2 region in some depth slice). The depth dimension remains unchanged. More generally, the pooling layer:
+Người ta rất hay thêm lớp Pooling vào sau các lớp Conv trong cấu trúc ConvNet. Chức năng của nó là giảm số chiều không gian biểu diễn, dẫn đến giảm số lượng tham số và tính toán trong mạng, và cũng kiểm soát cả overfitting nữa. Lớp Pooling thực hiện độc lập trên mỗi độ sâu của khối đầu vào và thực hiện thay đổi kích thước hình học của nó, sử  dụng thao tác MAX. Một dạng phổ biến lớp pooling với kích thước filter bằng 2x2, bước kéo là 2 trên mỗi độ sâu ở đầu vào dọc theo chiều rộng và chiều cao, giảm đến 75% lượng kích hoạt (activations). Mỗi thao tác MAX nhận 4 số đầu vào (một khu vực nhỏ kích thước 2x2 ở mỗi độ sâu). Trường độ sâu vẫn không đổi nha. Nói chung, lớp pooling sẽ:
 
-- Accepts a volume of size \\(W_1 \times H_1 \times D_1\\)
-- Requires two hyperparameters: 
-  - their spatial extent \\(F\\), 
-  - the stride \\(S\\), 
-- Produces a volume of size \\(W_2 \times H_2 \times D_2\\) where:
+- Nhận một khối đầu vào với kích thước \\(W_1 \times H_1 \times D_1\\)
+- Yêu cầu các siêu tham số: 
+  - Phạm vi không gian \\(F\\), 
+  - Bước kéo \\(S\\), 
+- Tạo ra một khối với kích thước \\(W_2 \times H_2 \times D_2\\) trong đó:
   - \\(W_2 = (W_1 - F)/S + 1\\)
   - \\(H_2 = (H_1 - F)/S + 1\\)
   - \\(D_2 = D_1\\)
-- Introduces zero parameters since it computes a fixed function of the input
-- Note that it is not common to use zero-padding for Pooling layers
+- Không có parameter nào hết vì nó là hàm thực hiện cố định trên đầu vào
+- Chú ý là ít khi người ta zero-padding cho lớp pooling
 
-It is worth noting that there are only two commonly seen variations of the max pooling layer found in practice: A pooling layer with \\(F = 3, S = 2\\) (also called overlapping pooling), and more commonly \\(F = 2, S = 2\\). Pooling sizes with larger receptive fields are too destructive.
+Một điểm đáng lưu ý ở đây là, chỉ có 2 dạng phổ biến thường thấy của lớp max pooling trong thực tế: Một lớp pooling với \\(F = 3, S = 2\\) (cũng được gọi tên là pooling đè lên nhau overlapping pooling), và một dạng phổ biến hơn là \\(F = 2, S = 2\\). Pooling với kích thước lớn hơn thì gây ra mất quá nhiều thông tins.
 
-**General pooling**. In addition to max pooling, the pooling units can also perform other functions, such as *average pooling* or even *L2-norm pooling*. Average pooling was often used historically but has recently fallen out of favor compared to the max pooling operation, which has been shown to work better in practice.
+**General pooling**. Thêm một chút về max pooling, các đơn vị pooling có thể thực hiện thêm các hàm khác, như pooling trung bình *average pooling* hoặc thậm chí *L2-norm pooling*. Pooling trung bình thường được sử dụng trước đây thôi giờ không còn được phổ biến nữa khi so sánh với max pooling, cái mà được chỉ ra là chạy tốt hơn trong thực tế.
 
 <div class="fig figcenter fighighlight">
   <img src="/assets/cnn/pool.jpeg" width="36%">
   <img src="/assets/cnn/maxpool.jpeg" width="59%" style="border-left: 1px solid black;">
   <div class="figcaption">
-    Pooling layer downsamples the volume spatially, independently in each depth slice of the input volume. <b>Left:</b> In this example, the input volume of size [224x224x64] is pooled with filter size 2, stride 2 into output volume of size [112x112x64]. Notice that the volume depth is preserved. <b>Right:</b> The most common downsampling operation is max, giving rise to <b>max pooling</b>, here shown with a stride of 2. That is, each max is taken over 4 numbers (little 2x2 square).
+    Lớp pooling giảm chiều không gian của khối, theo từng độ sâu độc lập với nhau ở đầu vào. <b>Phía trái:</b> Trong ví dụ này, kích thước khối đầu vào [224x224x64] được pooled với kích thước 2, bước kéo 2 tạo ra đầu ra có kích thước [112x112x64]. Chú ý rằng độ sâu của khối vẫn bảo toàn. <b>Phía phải:</b> Hầu hết phép giảm chiều sử dụng max, và được gọi là <b>max pooling</b>, ở đây bước kéo là 2. Hay trên đó, mỗi hàm max sẽ thực hiện trên 4 số (ô vuông nhỏ kích thước 2x2).
   </div>
 </div>
 
-**Backpropagation**. Recall from the backpropagation chapter that the backward pass for a max(x, y) operation has a simple interpretation as only routing the gradient to the input that had the highest value in the forward pass. Hence, during the forward pass of a pooling layer it is common to keep track of the index of the max activation (sometimes also called *the switches*) so that gradient routing is efficient during backpropagation.
+**Phản hồi ngược**. Nhớ lại chương về phản hồi ngược trước đây, chiều ngược lại cho thao tác max(x, y) được diễn đạt tương đối đơn giản, chỉ cần dẫn hướng gradient đến cái đầu vào input có giá trị lớn nhất khi forward pass là xong. Cho nên, trong quá trình forward pass của pooling layer, người ta hay giữ lại index của số lớn nhất được chọn - max activation (thỉnh thoảng được gọi là *the switches*) vì thế việc dẫn hướng cho gradient khá hiệu quả khi backpropagation.
 
-**Getting rid of pooling**. Many people dislike the pooling operation and think that we can get away without it. For example, [Striving for Simplicity: The All Convolutional Net](http://arxiv.org/abs/1412.6806) proposes to discard the pooling layer in favor of architecture that only consists of repeated CONV layers. To reduce the size of the representation they suggest using larger stride in CONV layer once in a while. Discarding pooling layers has also been found to be important in training good generative models, such as variational autoencoders (VAEs) or generative adversarial networks (GANs). It seems likely that future architectures will feature very few to no pooling layers.
+**Loại bỏ việc pooling**. Nhiều người không thích thao tác pooling và nghĩ rằng chúng ta có thể làm mà không cần nó. Ví dụ, [Striving for Simplicity: The All Convolutional Net](http://arxiv.org/abs/1412.6806) đề xuất bỏ lớp pooling để tạo ra kiến trúc chỉ chứa các lớp CONV mà thôi. Đối với việc giảm kích thước biểu diễn, họ gợi ý sử dụng một bước kéo - stride lớn hơn trong lớp CONV khi thực hiện. Việc bỏ lớp pooling cũng được phát hiện là rất quan trọng trong việc training good generative models, như variational autoencoders (VAEs) hoặc generative adversarial networks (GANs). Dường như các kiến trúc trong tương lai sẽ rất ít cho đến không có lớp pooling nữa.
 
 <a name='norm'></a>
 
-#### Normalization Layer
+#### Lớp chuẩn hoat - Normalization Layer
 
-Many types of normalization layers have been proposed for use in ConvNet architectures, sometimes with the intentions of implementing inhibition schemes observed in the biological brain. However, these layers have since fallen out of favor because in practice their contribution has been shown to be minimal, if any. For various types of normalizations, see the discussion in Alex Krizhevsky's [cuda-convnet library API](http://code.google.com/p/cuda-convnet/wiki/LayerParams#Local_response_normalization_layer_(same_map)).
+Nhiều loại lớp chuẩn hóa được đề xuất sử dụng trong kiến trúc ConvNet, thỉnh thoảng theo hướng thực thi cái mô hình ức chế - inhibition schemes được quan sát trong bộ não sinh học. Tuy nhiên, những lớp đó vẫn chưa được để ý đến nhiều trong thực tế hiệu quả của chúng được đưa ra rất ít, nếu có. Về các loại chuẩn hóa, xem thêm thảo luận của Alex Krizhevsky's [cuda-convnet library API](http://code.google.com/p/cuda-convnet/wiki/LayerParams#Local_response_normalization_layer_(same_map)).
 
 <a name='fc'></a>
 
-#### Fully-connected layer
+#### Lớp kết nối đầy đủ - Fully-connected layer
 
-Neurons in a fully connected layer have full connections to all activations in the previous layer, as seen in regular Neural Networks. Their activations can hence be computed with a matrix multiplication followed by a bias offset. See the *Neural Network* section of the notes for more information.
+Các neuron trong lớp fully connected có kết nối đến tất cả các activation ở lớp trước nó, giống như trong Neural Networks thông thường. Hàm kích hoạt của nó được tính bằng một phép nhân ma trận cộng với bias làm offset. Xem chương *Neural Network* trong cùng note để biết thêm.
 
 <a name='convert'></a>
 
 #### Converting FC layers to CONV layers 
 
-It is worth noting that the only difference between FC and CONV layers is that the neurons in the CONV layer are connected only to a local region in the input, and that many of the neurons in a CONV volume share parameters. However, the neurons in both layers still compute dot products, so their functional form is identical. Therefore, it turns out that it's possible to convert between FC and CONV layers:
+Một điểm đáng lưu ý là chỉ có một điểm khác biệt duy nhất giữa lớp FC và CONV các neuron trong lớp CONV được kết nối chỉ với một vùng cục bộ ở đầu vào, và có rất nhiều neuron trong lớp CONV chia sẻ tham số với nhau. Tuy nhiên, neuron trong cả 2 lớp này đều phải tính toán tích vô hướng, vì thế về mặt chức năng thì giống nhau. Chính vì vậy, dẫn đến việc có thể chuyển đổi giữa lớp FC và CONV layers:
 
-- For any CONV layer there is an FC layer that implements the same forward function. The weight matrix would be a large matrix that is mostly zero except for at certain blocks (due to local connectivity) where the weights in many of the blocks are equal (due to parameter sharing).
-- Conversely, any FC layer can be converted to a CONV layer. For example, an FC layer with \\(K = 4096\\) that is looking at some input volume of size \\(7 \times 7 \times 512\\) can be equivalently expressed as a CONV layer with \\(F = 7, P = 0, S = 1, K = 4096\\). In other words, we are setting the filter size to be exactly the size of the input volume, and hence the output will simply be \\(1 \times 1 \times 4096\\) since only a single depth column "fits" across the input volume, giving identical result as the initial FC layer.
+- Với bất cứ lớp CONV, cũng có một lớp FC thực hiện cùng một hàm forward pass. Ma trận trọng số là một ma trận lớn mà giá trị các ô hầu hết là 0 trừ một vài khối nhất định (do kết nối là cục bộ mà) rồi thì trọng số của rất nhiều khói sử dụng cùng một ma trận trọng số (do chia sẻ tham số).
+- Ngược lại, mọi lớp FC có thể được chuyển đổi thành lớp CONV. Ví dụ, một lớp FC với \\(K = 4096\\), khi xem một khối đầu vào có kích thước \\(7 \times 7 \times 512\\) có thể tương đương với một lớp CONV với \\(F = 7, P = 0, S = 1, K = 4096\\). Nói cách khác, chúng ta thiết lập kích thước filter đúng bằng kích thước của đầu vào luôn, đầu ra sẽ đơn giản có kích thước \\(1 \times 1 \times 4096\\) vì mỗi độ sâu chỉ chứa kế quả xoắn với đầu vào đúng 1 lần, tức là kết quả tương lớp FC luôn.
 
-**FC->CONV conversion**. Of these two conversions, the ability to convert an FC layer to a CONV layer is particularly useful in practice. Consider a ConvNet architecture that takes a 224x224x3 image, and then uses a series of CONV layers and POOL layers to reduce the image to an activations volume of size 7x7x512 (in an *AlexNet* architecture that we'll see later, this is done by use of 5 pooling layers that downsample the input spatially by a factor of two each time, making the final spatial size 224/2/2/2/2/2 = 7). From there, an AlexNet uses two FC layers of size 4096 and finally the last FC layers with 1000 neurons that compute the class scores. We can convert each of these three FC layers to CONV layers as described above:
+**FC->CONV conversion**. Trong 2 loại chuyển đổi, việc chuyển từ lớp FC sang lớp CONV đặc biệt hữu ích trong thực tế. Xét một kiến trúc ConvNet lấy đầu vào là ảnh 224x224x3, và sử dụng một loạt lớp CONV và POOL về thành một khối kích hoạt có kích thước 7x7x512 (trong kiến trúc *AlexNet* chúng ta sẽ thấy sau đây, sử dụng 5 lớp pooling giảm không gian đầu vào xuống theo hệ số 2 mỗi lần, để cuối cùng không gian kết quả có số chiều 224/2/2/2/2/2 = 7). Từ đây, AlexNet sử dụng 2 lớp FC kích thước 4096 sau đó là lớp FC cuối cùng có 1000 neurons để tính toán core cho từng lớp. Chúng ta có thể chuyển mỗi lớp trong 3 lớp FC cuối sang lớp CONV tương ứng theo mô tả dưới đây:
 
-- Replace the first FC layer that looks at [7x7x512] volume with a CONV layer that uses filter size \\(F = 7\\), giving output volume [1x1x4096].
-- Replace the second FC layer with a CONV layer that uses filter size \\(F = 1\\), giving output volume [1x1x4096]
-- Replace the last FC layer similarly, with \\(F=1\\), giving final output [1x1x1000]
+- Thay thế lớp FC đầu tiên cái lấy khối [7x7x512] làm đầu vào bằng một lớp CONV có kích thước filter \\(F = 7\\), sẽ tạo ra khối đầu ra có kích thước [1x1x4096].
+- Thay thế lớp FC thứ 2 bằng một lớp CONV với kích thước filter \\(F = 1\\), sẽ tạo ra khối đầu ra kích thước [1x1x4096]
+- Thay thế lớp FC cuối cùng cũng tương tự, với \\(F=1\\), và tạo ra khối đầu ra cuối cùng [1x1x1000]
 
-Each of these conversions could in practice involve manipulating (e.g. reshaping) the weight matrix \\(W\\) in each FC layer into CONV layer filters. It turns out that this conversion allows us to "slide" the original ConvNet very efficiently across many spatial positions in a larger image, in a single forward pass. 
+Mỗi phép chuyển đổi ở trên trong thực tế sẽ thực hiện thao tác (ví dụ: reshaping) với ma trận trọng số \\(W\\) trong mỗi lớp FC thành filter trong lớp CONV tương ứng. Điều này chỉ ra rằng các phép chuyển đổi này cho phép chúng ta "kéo" kiến trúc ConvNet một cách hiệu quả qua nhiều vị trí không gian khác nhau trong trong một ảnh lớp hơn, chỉ trong một phép forward pass thôi. 
 
 For example, if 224x224 image gives a volume of size [7x7x512] - i.e. a reduction by 32, then forwarding an image of size 384x384 through the converted architecture would give the equivalent volume in size [12x12x512], since 384/32 = 12. Following through with the next 3 CONV layers that we just converted from FC layers would now give the final volume of size [6x6x1000], since (12 - 7)/1 + 1 = 6. Note that instead of a single vector of class scores of size [1x1x1000], we're now getting an entire 6x6 array of class scores across the 384x384 image.
 
